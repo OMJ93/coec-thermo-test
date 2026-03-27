@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thermo Dataset Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }
+    .row { margin-bottom: 12px; }
+    label { display: inline-block; width: 220px; }
+    input, select, button { padding: 6px 8px; }
+    pre { background: #f4f4f4; padding: 12px; border-radius: 8px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Thermo Dataset Browser Test</h1>
+
+  <div class="row">
+    <label for="T_C">T_C</label>
+    <input id="T_C" type="number" value="750" />
+  </div>
+
+  <div class="row">
+    <label for="ratio">ratio_h2o_to_co2</label>
+    <input id="ratio" type="number" step="0.1" value="4.0" />
+  </div>
+
+  <div class="row">
+    <label for="conversion">conversion</label>
+    <input id="conversion" type="number" step="0.1" value="0.6" />
+  </div>
+
+  <div class="row">
+    <label for="air_ratio">air_outlet_o2_n2_ratio</label>
+    <input id="air_ratio" type="number" step="0.1" value="0.5" />
+  </div>
+
+  <div class="row">
+    <label for="j_query">j_A_cm2 to interpolate</label>
+    <input id="j_query" type="number" step="0.01" value="0.73" />
+  </div>
+
+  <div class="row">
+    <button id="runBtn">Run interpolation</button>
+  </div>
+
+  <h2>Result</h2>
+  <pre id="output">Loading...</pre>
+
+  <script type="module" src="./thermo.js"></script>
+</body>
+</html>
