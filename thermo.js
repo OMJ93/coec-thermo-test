@@ -297,6 +297,14 @@ function findBracketForRoot(rows, ivPoints, n_cells, area_cm2) {
   return null;
 }
 
+function formatSccm(v) {
+  if (!Number.isFinite(v)) return "-";
+  if (v > 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (v > 1e3) return (v / 1e3).toFixed(2) + "k";
+  return v.toFixed(0);
+}
+
+
 function bisectRoot(rows, ivPoints, n_cells, area_cm2, jLeft, jRight, tol = 1e-6, maxIter = 100) {
   let left = jLeft;
   let right = jRight;
@@ -361,38 +369,51 @@ function speciesLhvPowerW(species, molarFlowMolS) {
 }
 
 function buildFuelInSccmString(row) {
-  const h2o = molSccm(row.fuel_in_n_H2O_mol_s || 0);
-  const co2 = molSccm(row.fuel_in_n_CO2_mol_s || 0);
-  return `H2O ${formatCompact(h2o, 2)} | CO2 ${formatCompact(co2, 2)}`;
+  return `
+H2O  ${formatSccm(molSccm(row.fuel_in_n_H2O_mol_s))}
+CO2  ${formatSccm(molSccm(row.fuel_in_n_CO2_mol_s))}
+`.trim();
 }
 
 function buildFuelOutSccmString(row) {
-  const h2 = molSccm(row.fuel_out_n_H2_mol_s || 0);
-  const co = molSccm(row.fuel_out_n_CO_mol_s || 0);
-  const h2o = molSccm(row.fuel_out_n_H2O_mol_s || 0);
-  const co2 = molSccm(row.fuel_out_n_CO2_mol_s || 0);
-  const ch4 = molSccm(row.fuel_out_n_CH4_mol_s || 0);
-  return `H2 ${formatCompact(h2, 2)} | CO ${formatCompact(co, 2)} | H2O ${formatCompact(h2o, 2)} | CO2 ${formatCompact(co2, 2)} | CH4 ${formatCompact(ch4, 2)}`;
+  return `
+H2   ${formatSccm(molSccm(row.fuel_out_n_H2_mol_s))}
+CO   ${formatSccm(molSccm(row.fuel_out_n_CO_mol_s))}
+H2O  ${formatSccm(molSccm(row.fuel_out_n_H2O_mol_s))}
+CO2  ${formatSccm(molSccm(row.fuel_out_n_CO2_mol_s))}
+CH4  ${formatSccm(molSccm(row.fuel_out_n_CH4_mol_s))}
+`.trim();
 }
 
 function buildAirInSccmString(row) {
-  const o2 = molSccm(row.air_in_n_O2_mol_s || 0);
-  const n2 = molSccm(row.air_in_n_N2_mol_s || 0);
-  return `O2 ${formatCompact(o2, 2)} | N2 ${formatCompact(n2, 2)}`;
+  return `
+O2   ${formatSccm(molSccm(row.air_in_n_O2_mol_s))}
+N2   ${formatSccm(molSccm(row.air_in_n_N2_mol_s))}
+`.trim();
 }
 
 function buildAirOutSccmString(row) {
-  const o2 = molSccm(row.air_out_n_O2_mol_s || 0);
-  const n2 = molSccm(row.air_out_n_N2_mol_s || 0);
-  return `O2 ${formatCompact(o2, 2)} | N2 ${formatCompact(n2, 2)}`;
+  return `
+O2   ${formatSccm(molSccm(row.air_out_n_O2_mol_s))}
+N2   ${formatSccm(molSccm(row.air_out_n_N2_mol_s))}
+`.trim();
 }
 
 function buildFuelCompositionString(row) {
-  return `H2 ${formatPercent(row.fuel_out_y_H2)} | CO ${formatPercent(row.fuel_out_y_CO)} | H2O ${formatPercent(row.fuel_out_y_H2O)} | CO2 ${formatPercent(row.fuel_out_y_CO2)} | CH4 ${formatPercent(row.fuel_out_y_CH4)}`;
+  return `
+H2   ${formatPercent(row.fuel_out_y_H2)}
+CO   ${formatPercent(row.fuel_out_y_CO)}
+H2O  ${formatPercent(row.fuel_out_y_H2O)}
+CO2  ${formatPercent(row.fuel_out_y_CO2)}
+CH4  ${formatPercent(row.fuel_out_y_CH4)}
+`.trim();
 }
 
 function buildAirCompositionString(row) {
-  return `O2 ${formatPercent(row.air_out_y_O2)} | N2 ${formatPercent(row.air_out_y_N2)}`;
+  return `
+O2   ${formatPercent(row.air_out_y_O2)}
+N2   ${formatPercent(row.air_out_y_N2)}
+`.trim();
 }
 
 function getInputValue(id) {
@@ -416,6 +437,9 @@ function updateStatus({ dataset, mode, rows }) {
   if (mode !== undefined) setText("modeStatus", mode);
   if (rows !== undefined) setText("rowStatus", rows);
 }
+
+
+
 
 function clearResultCards() {
   setText("tnBadge", "Waiting");

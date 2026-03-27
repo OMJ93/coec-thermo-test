@@ -275,6 +275,10 @@
       vertical-align: top;
     }
 
+    .table td{
+      white-space: pre-line;
+    }
+
     .table th{
       color: var(--muted);
       font-size: 12px;
@@ -389,12 +393,16 @@
         <div class="section">
           <h2 class="section-title">IV points</h2>
           <div class="field full">
-            <label for="iv_points">j_A/cm², V (one pair per line)</label>
+          <label for="iv_points">
+            j_A/cm², V (one pair per line)<br>
+            <span style="font-size:12px; color:#6b7280;">
+              입력 온도에 맞는 성능 linear 포인트 3개 이상 입력
+            </span>
+          </label>  
             <textarea id="iv_points">0.0, 1.30
-0.1, 0.89
-0.5, 1.0243
-1.0, 1.1893
-</textarea>
+0.1, 0.9
+0.5, 1.0
+1.0, 1.19</textarea>
           </div>
         </div>
 
