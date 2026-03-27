@@ -1,4 +1,4 @@
-async function loadThermoDataset(jsonPath = "./thermo_dataset.json") {
+async function loadThermoDataset(jsonPath = "./thermo_dataset_unit.json") {
   const response = await fetch(jsonPath);
   if (!response.ok) {
     throw new Error(`Failed to load dataset: ${response.status}`);
@@ -181,7 +181,9 @@ function stackPowerW(j_A_cm2, V_V, n_cells, area_cm2) {
 }
 
 function computeResidualAtJ(rows, ivPoints, j_A_cm2, n_cells, area_cm2) {
-  const thermoRow = interpolateRowAtJ(rows, j_A_cm2);
+  const unitRow = interpolateRowAtJ(rows, j_A_cm2);
+  const thermoRow = applyScaleToThermoRow(unitRow, n_cells, area_cm2);
+
   const V_V = voltageFromCurrentDensity(ivPoints, j_A_cm2);
   const P_stack_W = stackPowerW(j_A_cm2, V_V, n_cells, area_cm2);
   const residual_W = Number(thermoRow.thermo_term_W) - P_stack_W;
@@ -193,6 +195,7 @@ function computeResidualAtJ(rows, ivPoints, j_A_cm2, n_cells, area_cm2) {
     thermo_term_W: Number(thermoRow.thermo_term_W),
     residual_W,
     thermoRow,
+    unitRow,
   };
 }
 
@@ -302,7 +305,7 @@ function getStackSetting() {
 
 async function init() {
   try {
-    DATASET = await loadThermoDataset("./thermo_dataset.json");
+    DATASET = await loadThermoDataset("./thermo_dataset_unit.json");
     render({ status: "dataset loaded", n_records: DATASET.length });
   } catch (err) {
     render({ error: String(err) });
@@ -313,18 +316,21 @@ async function init() {
     try {
       const condition = getSelectedCondition();
       const jQuery = getInputValue("j_query");
+      const { n_cells, area_cm2 } = getStackSetting();
 
       const selectedRows = filterRowsByCondition(DATASET, condition);
       if (selectedRows.length === 0) {
         throw new Error("No matching rows found for the selected condition.");
       }
 
-      const interpolated = interpolateRowAtJ(selectedRows, jQuery);
+      const unitRow = interpolateRowAtJ(selectedRows, jQuery);
+      const interpolated = applyScaleToThermoRow(unitRow, n_cells, area_cm2);
 
       render({
         mode: "interpolation only",
         matched_rows: selectedRows.length,
-        interpolated_row: interpolated,
+        unit_basis_row: unitRow,
+        scaled_row: interpolated,
       });
     } catch (err) {
       render({ error: String(err) });
@@ -364,5 +370,50 @@ async function init() {
     }
   });
 }
+
+function applyScaleToThermoRow(unitRow, n_cells, area_cm2) {
+  const scale = n_cells * area_cm2;
+
+  const scaledKeys = new Set([
+    "H_in_W",
+    "H_out_W",
+    "thermo_term_W",
+
+    "fuel_in_kg_s",
+    "air_in_kg_s",
+    "fuel_out_kg_s",
+    "air_out_kg_s",
+
+    "fuel_in_n_H2O_mol_s",
+    "fuel_in_n_CO2_mol_s",
+
+    "fuel_out_n_H2_mol_s",
+    "fuel_out_n_CO_mol_s",
+    "fuel_out_n_H2O_mol_s",
+    "fuel_out_n_CO2_mol_s",
+    "fuel_out_n_CH4_mol_s",
+
+    "air_in_n_O2_mol_s",
+    "air_in_n_N2_mol_s",
+
+    "air_out_n_O2_mol_s",
+    "air_out_n_N2_mol_s",
+  ]);
+
+  const out = {};
+
+  for (const [key, value] of Object.entries(unitRow)) {
+    const num = Number(value);
+
+    if (scaledKeys.has(key) && Number.isFinite(num)) {
+      out[key] = num * scale;
+    } else {
+      out[key] = value;
+    }
+  }
+
+  return out;
+}
+
 
 init();
