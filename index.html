@@ -3,73 +3,558 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Thermo Dataset + TN Solver</title>
+  <title>Co-EC TN Solver</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }
-    .row { margin-bottom: 12px; }
-    label { display: inline-block; width: 240px; vertical-align: top; }
-    input, textarea, button { padding: 6px 8px; }
-    textarea { width: 420px; height: 140px; font-family: monospace; }
-    pre { background: #f4f4f4; padding: 12px; border-radius: 8px; overflow: auto; }
-    h2 { margin-top: 28px; }
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --line:#e5eaf2;
+      --text:#162033;
+      --muted:#5b667a;
+      --accent:#2563eb;
+      --accent-2:#1d4ed8;
+      --good:#0f9f6e;
+      --shadow:0 10px 30px rgba(16,24,40,.08);
+      --radius:20px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body{
+      margin:0;
+      font-family: Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .page{
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 20px 40px;
+    }
+
+    .hero{
+      margin-bottom: 20px;
+      padding: 24px 28px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, #1d4ed8, #2563eb 55%, #60a5fa);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1{
+      margin: 0 0 8px;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .hero p{
+      margin: 0;
+      color: rgba(255,255,255,.9);
+      font-size: 15px;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 390px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel{
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .panel .section{
+      padding: 22px 22px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel .section:last-child{
+      border-bottom: none;
+    }
+
+    .section-title{
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+
+    .field-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap: 6px;
+    }
+
+    .field.full{
+      grid-column: 1 / -1;
+    }
+
+    .field label{
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    input, textarea{
+      width:100%;
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius: 14px;
+      padding: 12px 13px;
+      font-size: 14px;
+      color: var(--text);
+      outline:none;
+      transition:.18s ease;
+    }
+
+    input:focus, textarea:focus{
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+    }
+
+    textarea{
+      min-height: 170px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      line-height: 1.45;
+    }
+
+    .button-row{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button{
+      border:none;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+
+    .btn-primary{
+      background: var(--accent);
+      color:white;
+    }
+
+    .btn-primary:hover{
+      background: var(--accent-2);
+    }
+
+    .btn-secondary{
+      background:#eef4ff;
+      color: var(--accent);
+    }
+
+    .btn-secondary:hover{
+      background:#dfe9ff;
+    }
+
+    .content{
+      display:flex;
+      flex-direction:column;
+      gap: 20px;
+    }
+
+    .status-bar{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background:#fff;
+      border:1px solid var(--line);
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .pill strong{
+      color: var(--text);
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .result-card{
+      background: var(--card);
+      border:1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .card-head{
+      padding: 18px 20px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+
+    .card-head h3{
+      margin:0;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+
+    .card-body{
+      padding: 16px 20px 18px;
+    }
+
+    .metric-grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric{
+      padding: 14px 14px 12px;
+      border:1px solid var(--line);
+      border-radius: 16px;
+      background:#fbfcff;
+    }
+
+    .metric .label{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .metric .value{
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .metric .sub{
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .table th,
+    .table td{
+      padding: 10px 8px;
+      border-bottom:1px solid var(--line);
+      text-align:left;
+      vertical-align: top;
+    }
+
+    .table th{
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .muted{
+      color: var(--muted);
+    }
+
+    .good{
+      color: var(--good);
+      font-weight: 800;
+    }
+
+    .raw-wrap{
+      background: var(--card);
+      border:1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .raw-head{
+      padding: 16px 20px;
+      border-bottom:1px solid var(--line);
+      font-weight: 800;
+    }
+
+    pre{
+      margin:0;
+      padding: 18px 20px;
+      overflow:auto;
+      background:#fbfcff;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1080px){
+      .layout{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px){
+      .cards,
+      .metric-grid,
+      .field-grid{
+        grid-template-columns: 1fr;
+      }
+
+      .hero h1{
+        font-size: 26px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Thermo Dataset + TN Solver</h1>
+  <div class="page">
+    <section class="hero">
+      <h1>Co-EC Thermal Neutral Solver</h1>
+      <p>Interpolation-based thermo lookup, user-defined IV curve, TN point search, and stream/LHV summary.</p>
+    </section>
 
-  <h2>Thermo condition</h2>
+    <div class="layout">
+      <aside class="panel">
+        <div class="section">
+          <h2 class="section-title">Thermo condition</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="T_C">Temperature, °C</label>
+              <input id="T_C" type="number" value="750" />
+            </div>
+            <div class="field">
+              <label for="ratio">H2O / CO2 ratio</label>
+              <input id="ratio" type="number" step="0.1" value="4.0" />
+            </div>
+            <div class="field">
+              <label for="conversion">Conversion</label>
+              <input id="conversion" type="number" step="0.1" value="0.6" />
+            </div>
+            <div class="field">
+              <label for="air_ratio">Air outlet O2 / N2</label>
+              <input id="air_ratio" type="number" step="0.1" value="0.5" />
+            </div>
+            <div class="field full">
+              <label for="j_query">Inspect at j (optional test)</label>
+              <input id="j_query" type="number" step="0.01" value="0.73" />
+            </div>
+          </div>
+        </div>
 
-  <div class="row">
-    <label for="T_C">T_C</label>
-    <input id="T_C" type="number" value="750" />
+        <div class="section">
+          <h2 class="section-title">Stack scale</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label for="n_cells">Number of cells</label>
+              <input id="n_cells" type="number" step="1" value="100000" />
+            </div>
+            <div class="field">
+              <label for="area_cm2">Active area, cm²</label>
+              <input id="area_cm2" type="number" step="0.1" value="100" />
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">IV points</h2>
+          <div class="field full">
+            <label for="iv_points">j_A/cm², V (one pair per line)</label>
+            <textarea id="iv_points">0.0, 1.30
+0.2, 1.34
+0.4, 1.39
+0.6, 1.45
+0.8, 1.52
+1.0, 1.60
+1.2, 1.69
+1.4, 1.79</textarea>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="button-row">
+            <button id="tnBtn" class="btn-primary">Find TN point</button>
+            <button id="runBtn" class="btn-secondary">Inspect at j</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="status-bar">
+          <div class="pill"><span>Dataset</span><strong id="datasetStatus">Loading...</strong></div>
+          <div class="pill"><span>Mode</span><strong id="modeStatus">Ready</strong></div>
+          <div class="pill"><span>Matched rows</span><strong id="rowStatus">-</strong></div>
+        </div>
+
+        <section class="cards">
+          <article class="result-card">
+            <div class="card-head">
+              <h3>TN operating point</h3>
+              <span class="good" id="tnBadge">Waiting</span>
+            </div>
+            <div class="card-body">
+              <div class="metric-grid">
+                <div class="metric">
+                  <div class="label">Current density</div>
+                  <div class="value" id="tn_j">-</div>
+                  <div class="sub">A/cm²</div>
+                </div>
+                <div class="metric">
+                  <div class="label">Voltage</div>
+                  <div class="value" id="tn_v">-</div>
+                  <div class="sub">V</div>
+                </div>
+                <div class="metric">
+                  <div class="label">Stack power</div>
+                  <div class="value" id="stack_power">-</div>
+                  <div class="sub">kW</div>
+                </div>
+                <div class="metric">
+                  <div class="label">Residual</div>
+                  <div class="value" id="tn_residual">-</div>
+                  <div class="sub">W</div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="result-card">
+            <div class="card-head">
+              <h3>Energy output</h3>
+              <span class="muted">Stack-only basis</span>
+            </div>
+            <div class="card-body">
+              <div class="metric-grid">
+                <div class="metric">
+                  <div class="label">H2 LHV</div>
+                  <div class="value" id="h2_lhv">-</div>
+                  <div class="sub">kW</div>
+                </div>
+                <div class="metric">
+                  <div class="label">CO LHV</div>
+                  <div class="value" id="co_lhv">-</div>
+                  <div class="sub">kW</div>
+                </div>
+                <div class="metric">
+                  <div class="label">Total LHV</div>
+                  <div class="value" id="total_lhv">-</div>
+                  <div class="sub">kW</div>
+                </div>
+                <div class="metric">
+                  <div class="label">LHV efficiency</div>
+                  <div class="value" id="lhv_eff">-</div>
+                  <div class="sub">LHV / stack power</div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="result-card">
+            <div class="card-head">
+              <h3>Fuel side</h3>
+              <span class="muted">Inlet / outlet</span>
+            </div>
+            <div class="card-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>kg/s</th>
+                    <th>sccm / composition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Fuel inlet</td>
+                    <td id="fuel_in_kg">-</td>
+                    <td class="mono" id="fuel_in_sccm">-</td>
+                  </tr>
+                  <tr>
+                    <td>Fuel outlet</td>
+                    <td id="fuel_out_kg">-</td>
+                    <td class="mono" id="fuel_out_sccm">-</td>
+                  </tr>
+                  <tr>
+                    <td>Outlet composition</td>
+                    <td colspan="2" class="mono" id="fuel_out_comp">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="result-card">
+            <div class="card-head">
+              <h3>Air side</h3>
+              <span class="muted">Inlet / outlet</span>
+            </div>
+            <div class="card-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>kg/s</th>
+                    <th>sccm / composition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Air inlet</td>
+                    <td id="air_in_kg">-</td>
+                    <td class="mono" id="air_in_sccm">-</td>
+                  </tr>
+                  <tr>
+                    <td>Air outlet</td>
+                    <td id="air_out_kg">-</td>
+                    <td class="mono" id="air_out_sccm">-</td>
+                  </tr>
+                  <tr>
+                    <td>Outlet composition</td>
+                    <td colspan="2" class="mono" id="air_out_comp">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="raw-wrap">
+          <div class="raw-head">Raw output / debug</div>
+          <pre id="output">Loading...</pre>
+        </section>
+      </main>
+    </div>
   </div>
-
-  <div class="row">
-    <label for="ratio">ratio_h2o_to_co2</label>
-    <input id="ratio" type="number" step="0.1" value="4.0" />
-  </div>
-
-  <div class="row">
-    <label for="conversion">conversion</label>
-    <input id="conversion" type="number" step="0.1" value="0.6" />
-  </div>
-
-  <div class="row">
-    <label for="air_ratio">air_outlet_o2_n2_ratio</label>
-    <input id="air_ratio" type="number" step="0.1" value="0.5" />
-  </div>
-
-  <div class="row">
-    <label for="j_query">j_A_cm2 for interpolation test</label>
-    <input id="j_query" type="number" step="0.01" value="0.73" />
-  </div>
-
-  <h2>Stack setting</h2>
-
-  <div class="row">
-    <label for="n_cells">n_cells</label>
-    <input id="n_cells" type="number" step="1" value="100000" />
-  </div>
-
-  <div class="row">
-    <label for="area_cm2">area_cm2</label>
-    <input id="area_cm2" type="number" step="0.1" value="100" />
-  </div>
-
-  <h2>IV points</h2>
-  <div class="row">
-    <label for="iv_points">j_A_cm2, V_V (one pair per line)</label>
-    <textarea id="iv_points">0.0, 0.9
-1.0, 1.3</textarea>
-  </div>
-
-  <div class="row">
-    <button id="runBtn">Run interpolation</button>
-    <button id="tnBtn">Find TN point</button>
-  </div>
-
-  <h2>Result</h2>
-  <pre id="output">Loading...</pre>
 
   <script type="module" src="./thermo.js"></script>
 </body>

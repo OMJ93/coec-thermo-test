@@ -6,8 +6,41 @@ async function loadThermoDataset(jsonPath = "./thermo_dataset_unit.json") {
   return await response.json();
 }
 
+const LHV_MJ_PER_KG = {
+  H2: 119.96,
+  CO: 10.11,
+};
+
+const MW_KG_PER_MOL = {
+  H2: 0.00201588,
+  CO: 0.0280101,
+};
+
 function nearlyEqual(a, b, tol = 1e-9) {
   return Math.abs(Number(a) - Number(b)) <= tol;
+}
+
+function formatNumber(value, digits = 4) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function formatCompact(value, digits = 2) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function formatPercent(value, digits = 2) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return `${(num * 100).toFixed(digits)}%`;
+}
+
+function linearInterp(x, x0, x1, y0, y1) {
+  if (x1 === x0) return y0;
+  return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
 }
 
 function filterRowsByCondition(dataset, {
@@ -26,11 +59,6 @@ function filterRowsByCondition(dataset, {
 
 function sortRowsByJ(rows) {
   return [...rows].sort((a, b) => Number(a.j_A_cm2) - Number(b.j_A_cm2));
-}
-
-function linearInterp(x, x0, x1, y0, y1) {
-  if (x1 === x0) return y0;
-  return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
 }
 
 function interpolateRowAtJ(rows, jQuery) {
@@ -180,6 +208,50 @@ function stackPowerW(j_A_cm2, V_V, n_cells, area_cm2) {
   return n_cells * area_cm2 * j_A_cm2 * V_V;
 }
 
+function applyScaleToThermoRow(unitRow, n_cells, area_cm2) {
+  const scale = n_cells * area_cm2;
+
+  const scaledKeys = new Set([
+    "H_in_W",
+    "H_out_W",
+    "thermo_term_W",
+
+    "fuel_in_kg_s",
+    "air_in_kg_s",
+    "fuel_out_kg_s",
+    "air_out_kg_s",
+
+    "fuel_in_n_H2O_mol_s",
+    "fuel_in_n_CO2_mol_s",
+
+    "fuel_out_n_H2_mol_s",
+    "fuel_out_n_CO_mol_s",
+    "fuel_out_n_H2O_mol_s",
+    "fuel_out_n_CO2_mol_s",
+    "fuel_out_n_CH4_mol_s",
+
+    "air_in_n_O2_mol_s",
+    "air_in_n_N2_mol_s",
+
+    "air_out_n_O2_mol_s",
+    "air_out_n_N2_mol_s",
+  ]);
+
+  const out = {};
+
+  for (const [key, value] of Object.entries(unitRow)) {
+    const num = Number(value);
+
+    if (scaledKeys.has(key) && Number.isFinite(num)) {
+      out[key] = num * scale;
+    } else {
+      out[key] = value;
+    }
+  }
+
+  return out;
+}
+
 function computeResidualAtJ(rows, ivPoints, j_A_cm2, n_cells, area_cm2) {
   const unitRow = interpolateRowAtJ(rows, j_A_cm2);
   const thermoRow = applyScaleToThermoRow(unitRow, n_cells, area_cm2);
@@ -273,6 +345,56 @@ function findTNPoint(rows, ivPoints, n_cells, area_cm2) {
   return bisectRoot(rows, ivPoints, n_cells, area_cm2, jLeft, jRight);
 }
 
+function molSccm(nMolS) {
+  const R = 0.082057366080960;
+  const Tstd = 273.15;
+  const Pstd = 1.0;
+  const LPerMol = R * Tstd / Pstd;
+  return Number(nMolS) * LPerMol * 1000.0 * 60.0;
+}
+
+function speciesLhvPowerW(species, molarFlowMolS) {
+  const mw = MW_KG_PER_MOL[species];
+  const lhv = LHV_MJ_PER_KG[species];
+  if (!mw || !lhv) return 0;
+  return Number(molarFlowMolS) * mw * lhv * 1e6;
+}
+
+function buildFuelInSccmString(row) {
+  const h2o = molSccm(row.fuel_in_n_H2O_mol_s || 0);
+  const co2 = molSccm(row.fuel_in_n_CO2_mol_s || 0);
+  return `H2O ${formatCompact(h2o, 2)} | CO2 ${formatCompact(co2, 2)}`;
+}
+
+function buildFuelOutSccmString(row) {
+  const h2 = molSccm(row.fuel_out_n_H2_mol_s || 0);
+  const co = molSccm(row.fuel_out_n_CO_mol_s || 0);
+  const h2o = molSccm(row.fuel_out_n_H2O_mol_s || 0);
+  const co2 = molSccm(row.fuel_out_n_CO2_mol_s || 0);
+  const ch4 = molSccm(row.fuel_out_n_CH4_mol_s || 0);
+  return `H2 ${formatCompact(h2, 2)} | CO ${formatCompact(co, 2)} | H2O ${formatCompact(h2o, 2)} | CO2 ${formatCompact(co2, 2)} | CH4 ${formatCompact(ch4, 2)}`;
+}
+
+function buildAirInSccmString(row) {
+  const o2 = molSccm(row.air_in_n_O2_mol_s || 0);
+  const n2 = molSccm(row.air_in_n_N2_mol_s || 0);
+  return `O2 ${formatCompact(o2, 2)} | N2 ${formatCompact(n2, 2)}`;
+}
+
+function buildAirOutSccmString(row) {
+  const o2 = molSccm(row.air_out_n_O2_mol_s || 0);
+  const n2 = molSccm(row.air_out_n_N2_mol_s || 0);
+  return `O2 ${formatCompact(o2, 2)} | N2 ${formatCompact(n2, 2)}`;
+}
+
+function buildFuelCompositionString(row) {
+  return `H2 ${formatPercent(row.fuel_out_y_H2)} | CO ${formatPercent(row.fuel_out_y_CO)} | H2O ${formatPercent(row.fuel_out_y_H2O)} | CO2 ${formatPercent(row.fuel_out_y_CO2)} | CH4 ${formatPercent(row.fuel_out_y_CH4)}`;
+}
+
+function buildAirCompositionString(row) {
+  return `O2 ${formatPercent(row.air_out_y_O2)} | N2 ${formatPercent(row.air_out_y_N2)}`;
+}
+
 function getInputValue(id) {
   return Number(document.getElementById(id).value);
 }
@@ -281,11 +403,120 @@ function getInputText(id) {
   return document.getElementById(id).value;
 }
 
-function render(obj) {
+function renderRaw(obj) {
   document.getElementById("output").textContent = JSON.stringify(obj, null, 2);
 }
 
-let DATASET = [];
+function setText(id, value) {
+  document.getElementById(id).textContent = value;
+}
+
+function updateStatus({ dataset, mode, rows }) {
+  if (dataset !== undefined) setText("datasetStatus", dataset);
+  if (mode !== undefined) setText("modeStatus", mode);
+  if (rows !== undefined) setText("rowStatus", rows);
+}
+
+function clearResultCards() {
+  setText("tnBadge", "Waiting");
+  setText("tn_j", "-");
+  setText("tn_v", "-");
+  setText("stack_power", "-");
+  setText("tn_residual", "-");
+  setText("h2_lhv", "-");
+  setText("co_lhv", "-");
+  setText("total_lhv", "-");
+  setText("lhv_eff", "-");
+  setText("fuel_in_kg", "-");
+  setText("fuel_out_kg", "-");
+  setText("air_in_kg", "-");
+  setText("air_out_kg", "-");
+  setText("fuel_in_sccm", "-");
+  setText("fuel_out_sccm", "-");
+  setText("air_in_sccm", "-");
+  setText("air_out_sccm", "-");
+  setText("fuel_out_comp", "-");
+  setText("air_out_comp", "-");
+}
+
+function renderInspectResult(payload) {
+  clearResultCards();
+
+  updateStatus({
+    mode: "Inspect at j",
+    rows: String(payload.matched_rows),
+  });
+
+  const row = payload.scaled_row;
+
+  setText("tnBadge", "Inspect");
+  setText("tn_j", formatNumber(row.j_A_cm2, 4));
+  setText("tn_v", "-");
+  setText("stack_power", "-");
+  setText("tn_residual", "-");
+
+  setText("fuel_in_kg", formatNumber(row.fuel_in_kg_s, 6));
+  setText("fuel_out_kg", formatNumber(row.fuel_out_kg_s, 6));
+  setText("air_in_kg", formatNumber(row.air_in_kg_s, 6));
+  setText("air_out_kg", formatNumber(row.air_out_kg_s, 6));
+
+  setText("fuel_in_sccm", buildFuelInSccmString(row));
+  setText("fuel_out_sccm", buildFuelOutSccmString(row));
+  setText("air_in_sccm", buildAirInSccmString(row));
+  setText("air_out_sccm", buildAirOutSccmString(row));
+
+  setText("fuel_out_comp", buildFuelCompositionString(row));
+  setText("air_out_comp", buildAirCompositionString(row));
+
+  renderRaw(payload);
+}
+
+function renderTNResult(payload) {
+  clearResultCards();
+
+  updateStatus({
+    mode: "TN solved",
+    rows: String(payload.matched_rows),
+  });
+
+  const row = payload.thermo_row_at_TN;
+  const H2LhvW = speciesLhvPowerW("H2", row.fuel_out_n_H2_mol_s || 0);
+  const COLhvW = speciesLhvPowerW("CO", row.fuel_out_n_CO_mol_s || 0);
+  const totalLhvW = H2LhvW + COLhvW;
+  const eff = payload.P_stack_W > 0 ? totalLhvW / payload.P_stack_W : NaN;
+
+  setText("tnBadge", "TN found");
+  setText("tn_j", formatNumber(payload.TN_j_A_cm2, 4));
+  setText("tn_v", formatNumber(payload.TN_V_V, 4));
+  setText("stack_power", formatNumber(payload.P_stack_W / 1000, 3));
+  setText("tn_residual", formatCompact(payload.residual_W, 3));
+
+  setText("h2_lhv", formatNumber(H2LhvW / 1000, 3));
+  setText("co_lhv", formatNumber(COLhvW / 1000, 3));
+  setText("total_lhv", formatNumber(totalLhvW / 1000, 3));
+  setText("lhv_eff", Number.isFinite(eff) ? formatPercent(eff, 2) : "-");
+
+  setText("fuel_in_kg", formatNumber(row.fuel_in_kg_s, 6));
+  setText("fuel_out_kg", formatNumber(row.fuel_out_kg_s, 6));
+  setText("air_in_kg", formatNumber(row.air_in_kg_s, 6));
+  setText("air_out_kg", formatNumber(row.air_out_kg_s, 6));
+
+  setText("fuel_in_sccm", buildFuelInSccmString(row));
+  setText("fuel_out_sccm", buildFuelOutSccmString(row));
+  setText("air_in_sccm", buildAirInSccmString(row));
+  setText("air_out_sccm", buildAirOutSccmString(row));
+
+  setText("fuel_out_comp", buildFuelCompositionString(row));
+  setText("air_out_comp", buildAirCompositionString(row));
+
+  renderRaw({
+    ...payload,
+    H2_LHV_W: H2LhvW,
+    CO_LHV_W: COLhvW,
+    total_LHV_W: totalLhvW,
+    LHV_efficiency: eff,
+  });
+}
 
 function getSelectedCondition() {
   return {
@@ -303,12 +534,26 @@ function getStackSetting() {
   };
 }
 
+let DATASET = [];
+
 async function init() {
+  clearResultCards();
+
   try {
     DATASET = await loadThermoDataset("./thermo_dataset_unit.json");
-    render({ status: "dataset loaded", n_records: DATASET.length });
+    updateStatus({
+      dataset: `${DATASET.length} rows loaded`,
+      mode: "Ready",
+      rows: "-",
+    });
+    renderRaw({ status: "dataset loaded", n_records: DATASET.length });
   } catch (err) {
-    render({ error: String(err) });
+    updateStatus({
+      dataset: "Load failed",
+      mode: "Error",
+      rows: "-",
+    });
+    renderRaw({ error: String(err) });
     return;
   }
 
@@ -326,14 +571,15 @@ async function init() {
       const unitRow = interpolateRowAtJ(selectedRows, jQuery);
       const interpolated = applyScaleToThermoRow(unitRow, n_cells, area_cm2);
 
-      render({
+      renderInspectResult({
         mode: "interpolation only",
         matched_rows: selectedRows.length,
         unit_basis_row: unitRow,
         scaled_row: interpolated,
       });
     } catch (err) {
-      render({ error: String(err) });
+      updateStatus({ mode: "Error" });
+      renderRaw({ error: String(err) });
     }
   });
 
@@ -350,10 +596,7 @@ async function init() {
 
       const tn = findTNPoint(selectedRows, ivPoints, n_cells, area_cm2);
 
-      const H2_mol_s = Number(tn.thermoRow.fuel_out_n_H2_mol_s || 0);
-      const CO_mol_s = Number(tn.thermoRow.fuel_out_n_CO_mol_s || 0);
-
-      render({
+      renderTNResult({
         mode: "TN solver",
         matched_rows: selectedRows.length,
         TN_j_A_cm2: tn.j_A_cm2,
@@ -361,59 +604,13 @@ async function init() {
         P_stack_W: tn.P_stack_W,
         thermo_term_W: tn.thermo_term_W,
         residual_W: tn.residual_W,
-        fuel_out_n_H2_mol_s: H2_mol_s,
-        fuel_out_n_CO_mol_s: CO_mol_s,
         thermo_row_at_TN: tn.thermoRow,
       });
     } catch (err) {
-      render({ error: String(err) });
+      updateStatus({ mode: "Error" });
+      renderRaw({ error: String(err) });
     }
   });
 }
-
-function applyScaleToThermoRow(unitRow, n_cells, area_cm2) {
-  const scale = n_cells * area_cm2;
-
-  const scaledKeys = new Set([
-    "H_in_W",
-    "H_out_W",
-    "thermo_term_W",
-
-    "fuel_in_kg_s",
-    "air_in_kg_s",
-    "fuel_out_kg_s",
-    "air_out_kg_s",
-
-    "fuel_in_n_H2O_mol_s",
-    "fuel_in_n_CO2_mol_s",
-
-    "fuel_out_n_H2_mol_s",
-    "fuel_out_n_CO_mol_s",
-    "fuel_out_n_H2O_mol_s",
-    "fuel_out_n_CO2_mol_s",
-    "fuel_out_n_CH4_mol_s",
-
-    "air_in_n_O2_mol_s",
-    "air_in_n_N2_mol_s",
-
-    "air_out_n_O2_mol_s",
-    "air_out_n_N2_mol_s",
-  ]);
-
-  const out = {};
-
-  for (const [key, value] of Object.entries(unitRow)) {
-    const num = Number(value);
-
-    if (scaledKeys.has(key) && Number.isFinite(num)) {
-      out[key] = num * scale;
-    } else {
-      out[key] = value;
-    }
-  }
-
-  return out;
-}
-
 
 init();
